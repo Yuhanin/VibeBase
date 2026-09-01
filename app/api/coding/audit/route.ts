@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server'; import {createSupabaseServer} from '../../../../lib/auth';
+export async function POST(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const b=await req.json();return NextResponse.json({event:'coding_workflow',taskId:b.taskId||null,userId:user.id,recordedAt:new Date().toISOString(),metadata:b.metadata||{}})}
