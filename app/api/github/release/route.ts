@@ -1,0 +1,8 @@
+import {NextResponse} from 'next/server'
+import {createSupabaseServer} from '../../../../lib/auth'}
+
+export async function POST(req:Request){
+ const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const b=await req.json();if(!b.projectId||!b.tagName)return NextResponse.json({error:'projectId and tagName are required'},{status:400});
+ const {data:p}=await s.from('projects').select('github_owner,github_repo').eq('id',b.projectId).single();if(!p?.github_owner||!p.github_repo)return NextResponse.json({error:'Project GitHub repository is not configured'},{status:400});const token=process.env.GITHUB_TOKEN;if(!token)return NextResponse.json({error:'GitHub integration is not configured'},{status:503});
+ const r=await fetch(`https://api.github.com/repos/${p.github_owner}/${p.github_repo}/releases`,{method:'POST',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({tag_name:b.tagName,name:b.name||b.tagName,body:b.body||'',draft:Boolean(b.draft),prerelease:Boolean(b.prerelease)})});if(!r.ok)return NextResponse.json({error:`GitHub release failed (${r.status})`},{status:502});const release=await r.json();const {data:dbRelease}=await s.from('releases').insert({project_id:b.projectId,version:b.version||b.tagName,name:b.name||b.tagName,status:'released',release_notes:b.body||'',target_date:new Date().toISOString().slice(0,10)}).select().single();return NextResponse.json({github:{id:release.id,url:release.html_url,tagName:release.tag_name},release:dbRelease})
+}
