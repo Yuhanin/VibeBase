@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server'
+import {createSupabaseServer} from '../../../../lib/auth'
+export async function GET(){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const db=s;const [p,f,t,pr,k]=await Promise.all([db.from('projects').select('*').limit(20),db.from('features').select('*').limit(100),db.from('tasks').select('*').limit(200),db.from('prompts').select('*').limit(100),db.from('knowledge').select('*').limit(100)]);return NextResponse.json({generatedAt:new Date().toISOString(),projectCount:p.data?.length||0,projects:p.data||[],features:f.data||[],tasks:t.data||[],prompts:pr.data||[],knowledge:k.data||[]})}
