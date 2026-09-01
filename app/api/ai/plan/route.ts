@@ -1,4 +1,4 @@
 import {NextResponse} from 'next/server'
-import {createSupabaseServer} from '../../../../../lib/auth'
-import {planFromContext,validatePlan} from '../../../../../lib/ai-planning'
+import {createSupabaseServer} from '../../../../lib/auth'
+import {planFromContext,validatePlan} from '../../../../lib/ai-planning'
 export async function POST(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});try{const b=await req.json();if(!b.taskId&&!b.request?.trim())return NextResponse.json({error:'taskId or request is required'},{status:400});let context:any={task:{title:b.request?.trim()||'Task'}};if(b.taskId){const base=new URL('/api/ai/context/task',req.url);base.searchParams.set('taskId',b.taskId);const r=await fetch(base,{headers:{cookie:req.headers.get('cookie')||''}});if(!r.ok)return NextResponse.json(await r.json(),{status:r.status});context=await r.json()}const plan=validatePlan(planFromContext(context));return NextResponse.json({ok:true,taskId:b.taskId||null,plan,generatedAt:new Date().toISOString()})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Planning failed'},{status:400})}}
