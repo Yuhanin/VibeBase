@@ -1,0 +1,3 @@
+import { NextResponse } from 'next/server'
+import { createSupabaseServer } from '../../../../lib/auth'
+export async function GET(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const id=new URL(req.url).searchParams.get('taskId');if(!id)return NextResponse.json({error:'taskId is required'},{status:400});return NextResponse.json({taskId:id,checks:[{id:'context',label:'Project context loaded',required:true},{id:'plan',label:'Implementation plan approved',required:true},{id:'tests',label:'Tests/build pass',required:true},{id:'diff',label:'Diff reviewed',required:true},{id:'pr',label:'Pull request created',required:true}]})}
