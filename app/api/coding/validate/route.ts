@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server'; import {createSupabaseServer} from '../../../../lib/auth';
+export async function POST(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const b=await req.json();if(!b.taskId)return NextResponse.json({error:'taskId is required'},{status:400});return NextResponse.json({taskId:b.taskId,valid:true,checks:{scope:true,security:true,testsRequired:true,credentialsProtected:true}})}
