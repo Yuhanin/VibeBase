@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server';import {createSupabaseServer} from '../../../../lib/auth';import {buildAgentContract} from '../../../../lib/coding-agent';
+export async function POST(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});try{const b=await req.json();return NextResponse.json(buildAgentContract(b.request||'',b.changes||[]))}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Invalid contract'},{status:400})}}
