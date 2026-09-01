@@ -1,0 +1,4 @@
+import { NextResponse } from 'next/server'
+import { createSupabaseServer } from '../../../../lib/auth'
+
+export async function POST(req:Request){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const b=await req.json();if(!b.taskId)return NextResponse.json({error:'taskId is required'},{status:400});const {data:t}=await s.from('tasks').select('*').eq('id',b.taskId).single();if(!t)return NextResponse.json({error:'Task not found'},{status:404});return NextResponse.json({task:t,plan:{goal:t.title,steps:['Inspect repository and project context','Identify affected files','Implement the smallest safe change','Run tests and build','Review diff','Open pull request'],acceptanceCriteria:['Build succeeds','Relevant tests pass','No secrets exposed','Change matches task scope']}})}
