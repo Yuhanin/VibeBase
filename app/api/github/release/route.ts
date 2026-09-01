@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server'
-import {createSupabaseServer} from '../../../../lib/auth'}
+import {createSupabaseServer} from '../../../../lib/auth'
 
 export async function POST(req:Request){
  const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const b=await req.json();if(!b.projectId||!b.tagName)return NextResponse.json({error:'projectId and tagName are required'},{status:400});
