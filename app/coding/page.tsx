@@ -1,0 +1,9 @@
+'use client'
+import { useEffect, useState } from 'react'
+
+export default function CodingPage(){
+ const [tasks,setTasks]=useState<any[]>([]); const [taskId,setTaskId]=useState(''); const [request,setRequest]=useState(''); const [result,setResult]=useState<any>(); const [loading,setLoading]=useState(false)
+ useEffect(()=>{fetch('/api/tasks').then(r=>r.json()).then(j=>setTasks(j.tasks||[]))},[])
+ async function prepare(){setLoading(true);const r=await fetch('/api/coding/prepare',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({taskId})});setResult(await r.json());setLoading(false)}
+ return <main className="min-h-screen p-6 md:p-10"><div className="mx-auto max-w-5xl"><p className="text-sm tracking-[.2em] text-zinc-500">VIBEBASE / AI CODING</p><h1 className="mt-2 text-3xl font-bold">Coding workflow</h1><p className="mt-2 text-zinc-400">Prepare a task with project context before handing it to your coding agent.</p><section className="mt-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-6 space-y-5"><label className="block text-sm">Task<select value={taskId} onChange={e=>setTaskId(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3"> <option value="">Select a task</option>{tasks.map(t=><option key={t.id} value={t.id}>{t.title}</option>)}</select></label><label className="block text-sm">Coding request<textarea value={request} onChange={e=>setRequest(e.target.value)} rows={5} placeholder="Describe what the agent should implement…" className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3"/></label><button disabled={!taskId||loading} onClick={prepare} className="rounded-xl bg-white px-5 py-3 font-medium text-black disabled:opacity-40">{loading?'Preparing…':'Prepare coding task'}</button>{result&&<pre className="overflow-auto rounded-xl border border-zinc-800 p-4 text-xs text-zinc-400">{JSON.stringify(result,null,2)}</pre>}</section></div></main>
+}
