@@ -1,0 +1,3 @@
+import { NextResponse } from 'next/server'
+import { githubGet } from '../../../../lib/github'
+export async function GET(){try{const [commits,issues,pulls]=await Promise.all([githubGet('/commits?per_page=10'),githubGet('/issues?state=open&per_page=10'),githubGet('/pulls?state=open&per_page=10')]);return NextResponse.json({commits:commits.map((x:any)=>({sha:x.sha,message:x.commit?.message?.split('\n')[0],date:x.commit?.author?.date})),openIssues:issues.filter((x:any)=>!x.pull_request).length,openPullRequests:pulls.length})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'GitHub error'},{status:502})}}
