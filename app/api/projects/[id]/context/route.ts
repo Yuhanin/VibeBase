@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { buildProjectContext } from '../../../../../lib/ai-context'
-
-const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+import { getAuthenticatedApiContext, unauthorized } from '../../../../../lib/api-auth'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
   const { id } = await params
-  const supabase = db()
   const [project, features, tasks, prompts, documents, decisions, issues, releases] = await Promise.all([
     supabase.from('projects').select('*').eq('id', id).single(),
     supabase.from('features').select('*').eq('project_id', id).order('created_at'),
