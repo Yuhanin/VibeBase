@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedApiContext, unauthorized } from '../../../../../../lib/api-auth'
 import { planFromContext, validatePlan, type CodingPlan } from '../../../../../../lib/ai-planning'
+import { generateAiCodingPlan } from '../../../../../../lib/ai-planner'
 import { loadTaskContext } from '../../../../../../lib/task-context'
 
 export async function GET(_: Request, { params }: { params: Promise<{ runId:string }> }) {
@@ -24,28 +25,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
 
   const body = await request.json().catch(() => ({}))
   let plan: CodingPlan
+  let generator: 'manual'|'ai'|'template' = 'template'
   try {
     const context = await loadTaskContext(supabase, run.task_id)
-    plan = validatePlan(body.plan ? body.plan as CodingPlan : planFromContext(context))
+    if (body.plan) {
+      plan = validatePlan(body.plan as CodingPlan)
+      generator = 'manual'
+    } else {
+      const aiPlan = await generateAiCodingPlan(context, run.request)
+      if (aiPlan) { plan = aiPlan; generator = 'ai' }
+      else plan = planFromContext(context)
+    }
   } catch (error) {
-    return NextResponse.json({ error:error instanceof Error ? error.message : 'Planning failed' }, { status:400 })
+    return NextResponse.json({ error:error instanceof Error ? error.message : 'Planning failed' }, { status:502 })
   }
 
   const { data:latest } = await supabase.from('coding_plans').select('version').eq('run_id', runId).order('version', { ascending:false }).limit(1).maybeSingle()
   const version = (latest?.version ?? 0) + 1
-
   await supabase.from('coding_plans').update({ status:'superseded' }).eq('run_id', runId).in('status', ['draft','pending_approval','approved'])
-  const { data:created, error } = await supabase.from('coding_plans').insert({
-    run_id:runId,
-    task_id:run.task_id,
-    user_id:user.id,
-    version,
-    status:'pending_approval',
-    plan,
-  }).select().single()
+  const { data:created, error } = await supabase.from('coding_plans').insert({ run_id:runId, task_id:run.task_id, user_id:user.id, version, status:'pending_approval', plan }).select().single()
   if (error) return NextResponse.json({ error:error.message }, { status:500 })
 
   await supabase.from('coding_runs').update({ active_plan_id:created.id, status:'awaiting_approval', updated_at:new Date().toISOString() }).eq('id', runId).eq('user_id', user.id)
-  await supabase.from('coding_run_events').insert({ run_id:runId, event_type:'plan_created', status:'awaiting_approval', message:`Plan v${version} created`, metadata:{ planId:created.id, version } })
-  return NextResponse.json({ plan:created }, { status:201 })
+  await supabase.from('coding_run_events').insert({ run_id:runId, event_type:'plan_created', status:'awaiting_approval', message:`Plan v${version} created by ${generator}`, metadata:{ planId:created.id, version, generator } })
+  return NextResponse.json({ plan:created, generator, approvalReady:plan.files.length>0 && plan.tests.length>0 && plan.verification.length>0 }, { status:201 })
 }
