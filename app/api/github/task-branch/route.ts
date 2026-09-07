@@ -9,6 +9,8 @@ export async function POST(request: Request) {
   if (!body.taskId) return NextResponse.json({ error:'taskId is required' }, { status:400 })
   const { data:task } = await s.from('tasks').select('id,title,project_id,github_branch').eq('id', body.taskId).single()
   if (!task) return NextResponse.json({ error:'Task not found' }, { status:404 })
+  const { data:canEdit } = await s.rpc('can_edit_project', { p_project_id:task.project_id })
+  if (!canEdit) return NextResponse.json({ error:'Insufficient project permission' }, { status:403 })
   if (task.github_branch) return NextResponse.json({ branch:task.github_branch, taskId:task.id, reused:true })
   const { data:project } = await s.from('projects').select('github_owner,github_repo,github_default_branch').eq('id', task.project_id).single()
   if (!project?.github_owner || !project.github_repo) return NextResponse.json({ error:'Project GitHub repository is not configured' }, { status:400 })
@@ -21,9 +23,7 @@ export async function POST(request: Request) {
   if (!ref.ok) return NextResponse.json({ error:`GitHub base branch unavailable (${ref.status})` }, { status:502 })
   const refData = await ref.json()
   const create = await fetch(`https://api.github.com/repos/${project.github_owner}/${project.github_repo}/git/refs`, {
-    method:'POST',
-    headers:{ ...headers, 'Content-Type':'application/json' },
-    body:JSON.stringify({ ref:`refs/heads/${branch}`, sha:refData.object.sha }),
+    method:'POST', headers:{ ...headers, 'Content-Type':'application/json' }, body:JSON.stringify({ ref:`refs/heads/${branch}`, sha:refData.object.sha }),
   })
   if (!create.ok) return NextResponse.json({ error:`Could not create branch (${create.status})` }, { status:502 })
   await s.from('tasks').update({ github_branch:branch, status:'active' }).eq('id', task.id)
