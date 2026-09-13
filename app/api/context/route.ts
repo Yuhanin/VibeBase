@@ -1,4 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-const db=()=>createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{autoRefreshToken:false,persistSession:false}})
-export async function GET(request:Request){const projectId=new URL(request.url).searchParams.get('projectId');if(!projectId)return NextResponse.json({error:'projectId is required'},{status:400});const c=db();const [p,f,t,d]=await Promise.all([c.from('projects').select('*').eq('id',projectId).single(),c.from('features').select('*').eq('project_id',projectId),c.from('tasks').select('*').eq('project_id',projectId),c.from('documents').select('*').eq('project_id',projectId)]);if(p.error)return NextResponse.json({error:p.error.message},{status:404});return NextResponse.json({context:{project:p.data,features:f.data||[],tasks:t.data||[],documents:d.data||[]}})}
+import { getAuthenticatedApiContext, unauthorized } from '../../../lib/api-auth'
+
+export async function GET(request: Request) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
+  const projectId = new URL(request.url).searchParams.get('projectId')
+  if (!projectId) return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+  const [project, features, tasks, documents] = await Promise.all([
+    supabase.from('projects').select('*').eq('id', projectId).single(),
+    supabase.from('features').select('*').eq('project_id', projectId),
+    supabase.from('tasks').select('*').eq('project_id', projectId),
+    supabase.from('documents').select('*').eq('project_id', projectId),
+  ])
+  if (project.error) return NextResponse.json({ error: project.error.message }, { status: 404 })
+  return NextResponse.json({ context: { project: project.data, features: features.data ?? [], tasks: tasks.data ?? [], documents: documents.data ?? [] } })
+}

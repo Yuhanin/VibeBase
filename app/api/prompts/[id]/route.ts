@@ -1,5 +1,24 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-const db=()=>createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{autoRefreshToken:false,persistSession:false}})
-export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){const {id}=await params;const b=await request.json();const {data,error}=await db().from('prompts').update({title:b.title?.trim(),content:b.content?.trim(),category:b.category}).eq('id',id).select().single();if(error)return NextResponse.json({error:error.message},{status:500});return NextResponse.json({prompt:data})}
-export async function DELETE(_:Request,{params}:{params:Promise<{id:string}>}){const {id}=await params;const {error}=await db().from('prompts').delete().eq('id',id);if(error)return NextResponse.json({error:error.message},{status:500});return new NextResponse(null,{status:204})}
+import { getAuthenticatedApiContext, unauthorized } from '../../../../lib/api-auth'
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
+  const { id } = await params
+  const body = await request.json()
+  const patch: Record<string, unknown> = {}
+  for (const key of ['title','content','category','tags']) if (body[key] !== undefined) patch[key] = body[key]
+  if (body.systemContext !== undefined) patch.system_context = body.systemContext
+  const { data, error } = await supabase.from('prompts').update(patch).eq('id', id).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ prompt: data })
+}
+
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
+  const { id } = await params
+  const { error } = await supabase.from('prompts').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return new NextResponse(null, { status: 204 })
+}

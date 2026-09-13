@@ -1,3 +1,29 @@
 import { NextResponse } from 'next/server'
-import { githubGet } from '../../../../lib/github'
-export async function GET(){try{const [repo,branches,commits,issues,pulls]=await Promise.all([githubGet(''),githubGet('/branches?per_page=30'),githubGet('/commits?per_page=10'),githubGet('/issues?state=open&per_page=20'),githubGet('/pulls?state=open&per_page=20')]);return NextResponse.json({repository:{fullName:repo.full_name,defaultBranch:repo.default_branch,private:repo.private,url:repo.html_url},branches:branches.map((b:any)=>({name:b.name,protected:b.protected})),commits:commits.map((c:any)=>({sha:c.sha,message:c.commit?.message?.split('\n')[0],date:c.commit?.author?.date})),issues:issues.filter((x:any)=>!x.pull_request).map((x:any)=>({number:x.number,title:x.title,url:x.html_url})),pullRequests:pulls.map((x:any)=>({number:x.number,title:x.title,url:x.html_url,branch:x.head?.ref}))})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'GitHub error'},{status:502})}}
+import { getAuthenticatedApiContext, unauthorized } from '../../../../lib/api-auth'
+import { getProjectGitHubConfig, projectGithubGet } from '../../../../lib/project-github'
+
+export async function GET(request: Request) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
+  const projectId = new URL(request.url).searchParams.get('projectId')
+  if (!projectId) return NextResponse.json({ error:'projectId is required' }, { status:400 })
+  try {
+    const config = await getProjectGitHubConfig(supabase, projectId)
+    const [repo,branches,commits,issues,pulls] = await Promise.all([
+      projectGithubGet(config, ''),
+      projectGithubGet(config, '/branches?per_page=30'),
+      projectGithubGet(config, '/commits?per_page=10'),
+      projectGithubGet(config, '/issues?state=open&per_page=20'),
+      projectGithubGet(config, '/pulls?state=open&per_page=20'),
+    ])
+    return NextResponse.json({
+      repository:{ fullName:repo.full_name, defaultBranch:repo.default_branch, private:repo.private, url:repo.html_url },
+      branches:branches.map((branch:any)=>({ name:branch.name, protected:branch.protected })),
+      commits:commits.map((commit:any)=>({ sha:commit.sha, message:commit.commit?.message?.split('\n')[0], date:commit.commit?.author?.date })),
+      issues:issues.filter((item:any)=>!item.pull_request).map((item:any)=>({ number:item.number, title:item.title, url:item.html_url })),
+      pullRequests:pulls.map((item:any)=>({ number:item.number, title:item.title, url:item.html_url, branch:item.head?.ref })),
+    })
+  } catch (error) {
+    return NextResponse.json({ error:error instanceof Error ? error.message : 'GitHub error' }, { status:502 })
+  }
+}

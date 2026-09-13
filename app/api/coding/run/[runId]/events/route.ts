@@ -1,2 +1,11 @@
-import {NextResponse} from 'next/server';import {createSupabaseServer} from '../../../../../../lib/auth';
-export async function POST(req:Request,{params}:{params:Promise<{runId:string}>}){const s=await createSupabaseServer();const {data:{user}}=await s.auth.getUser();if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});const {runId}=await params;const b=await req.json();const {data:run}=await s.from('coding_runs').select('id').eq('id',runId).eq('user_id',user.id).single();if(!run)return NextResponse.json({error:'Run not found'},{status:404});const {data:event,error}=await s.from('coding_run_events').insert({run_id:runId,event_type:b.eventType||'agent_event',status:b.status||null,message:b.message||null,metadata:b.metadata||{}}).select().single();if(error)return NextResponse.json({error:error.message},{status:400});return NextResponse.json({event})}
+import { NextResponse } from 'next/server'
+import { getAuthenticatedApiContext, unauthorized } from '../../../../../../lib/api-auth'
+
+export async function POST(_: Request, { params }: { params: Promise<{ runId:string }> }) {
+  const { supabase, user } = await getAuthenticatedApiContext()
+  if (!user) return unauthorized()
+  const { runId } = await params
+  const { data:run } = await supabase.from('coding_runs').select('id').eq('id', runId).eq('user_id', user.id).single()
+  if (!run) return NextResponse.json({ error:'Run not found' }, { status:404 })
+  return NextResponse.json({ error:'Coding run events are server-generated and cannot be written by clients' }, { status:403 })
+}
